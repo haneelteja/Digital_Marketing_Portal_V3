@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { supabaseAdmin } from '../../../../../../lib/supabaseAdmin';
-import { ok, badRequest, unauthorized, serverError, notFound } from '../../../../../../lib/apiResponse';
-import { logger } from '../../../../../../utils/logger';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { ok, badRequest, unauthorized, serverError, notFound } from '@/lib/apiResponse';
+import { logger } from '@/utils/logger';
 
 // POST /api/artwork-uploads/[id]/comments - Add a comment to an artwork upload
 export async function POST(

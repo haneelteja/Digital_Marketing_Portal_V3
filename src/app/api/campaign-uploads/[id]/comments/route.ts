@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { supabase } from '../../../../../../lib/supabaseClient';
-import { supabaseAdmin } from '../../../../../../lib/supabaseAdmin';
-import { ok, badRequest, unauthorized, serverError, notFound } from '../../../../../../lib/apiResponse';
-import { logger } from '../../../../../utils/logger';
+import { supabase } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { ok, badRequest, unauthorized, serverError, notFound } from '@/lib/apiResponse';
+import { logger } from '@/utils/logger';
 
 // POST /api/campaign-uploads/[id]/comments - Add a comment to an upload
 export async function POST(

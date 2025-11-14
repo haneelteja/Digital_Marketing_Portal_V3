@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { supabaseAdmin } from '../../../../../lib/supabaseAdmin';
-import { ok, badRequest, unauthorized, serverError, notFound } from '../../../../../lib/apiResponse';
-import { logger } from '../../../../../utils/logger';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { ok, badRequest, unauthorized, serverError, notFound } from '@/lib/apiResponse';
+import { logger } from '@/utils/logger';
 
 // PUT /api/artwork-uploads/[id] - Update artwork upload (e.g., approval status)
 export async function PUT(
