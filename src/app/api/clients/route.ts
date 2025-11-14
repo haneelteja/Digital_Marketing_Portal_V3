@@ -82,12 +82,39 @@ export async function GET(request: NextRequest) {
           assigned = raw.split(',').map((s) => s.trim()).filter(Boolean);
         }
 
-        // Filter clients for AGENCY_ADMIN based on assigned_clients
-        if (userData?.role === 'AGENCY_ADMIN' && assigned.length > 0) {
-          query = query.in('id', assigned);
+        // Log for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Clients API] User role:', userData?.role, 'Assigned clients:', assigned);
+        }
+
+        // Filter clients based on role and assigned_clients
+        if (userData?.role === 'AGENCY_ADMIN') {
+          if (assigned.length > 0) {
+            query = query.in('id', assigned);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[Clients API] AGENCY_ADMIN - Filtering by assigned clients:', assigned);
+            }
+          } else {
+            // If no assigned clients, return empty array for AGENCY_ADMIN
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[Clients API] AGENCY_ADMIN - No assigned clients, returning empty array');
+            }
+            return NextResponse.json({ data: [] });
+          }
         } else if (userData?.role === 'CLIENT') {
-          // CLIENT users don't see clients list (only their own client)
-          return NextResponse.json({ data: [] });
+          // CLIENT users should see their assigned clients
+          if (assigned.length > 0) {
+            query = query.in('id', assigned);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[Clients API] CLIENT - Filtering by assigned clients:', assigned);
+            }
+          } else {
+            // If no assigned clients, return empty array for CLIENT
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[Clients API] CLIENT - No assigned clients, returning empty array');
+            }
+            return NextResponse.json({ data: [] });
+          }
         }
         // IT_ADMIN sees all clients (no filter applied)
       }

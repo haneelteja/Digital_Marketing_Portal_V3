@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { useClientCache } from './ClientCacheProvider';
 import { Client } from '../types/user';
+import { logger } from '@/utils/logger';
 
 interface Post {
   client: string;
@@ -56,7 +57,7 @@ export const ClientPostsPieChart = ({ posts }: ClientPostsPieChartProps) => {
     if (process.env.NODE_ENV === 'development' && result.length > 0) {
       // Only log summary to reduce console noise
       const total = result.reduce((sum, item) => sum + item.count, 0);
-      console.log(`[ClientPostsPieChart] ${result.length} clients, ${total} total posts`);
+      logger.debug('Client posts summary', { clientCount: result.length, totalPosts: total, component: 'ClientPostsPieChart' });
     }
     
     return result;

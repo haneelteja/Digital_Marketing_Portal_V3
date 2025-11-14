@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
 import { User, Client } from '../../types/user';
 import ExcelJS from 'exceljs';
+import { logger } from '@/utils/logger';
 
 type Attachment = {
   filename: string;
@@ -120,10 +120,59 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
     setFilteredRecords(filtered);
   }, [records, filterClientId, filterMonth, searchTerm, sortField, sortDirection]);
 
+  // Helper function to get auth token from localStorage (avoids hanging on getSession)
+  const getAuthToken = (): string | null => {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (supabaseUrl) {
+        const projectRef = supabaseUrl.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1];
+        if (projectRef) {
+          const possibleKeys = [
+            `sb-${projectRef}-auth-token`,
+            `supabase.auth.token`,
+          ];
+          
+          // Check all keys starting with "sb-"
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.includes(projectRef)) {
+              possibleKeys.push(key);
+            }
+          }
+          
+          for (const storageKey of possibleKeys) {
+            const storedSession = window.localStorage.getItem(storageKey);
+            if (storedSession) {
+              try {
+                const sessionData = JSON.parse(storedSession);
+                const token = sessionData?.access_token 
+                  || sessionData?.session?.access_token
+                  || sessionData?.currentSession?.access_token;
+                
+                if (token && typeof token === 'string') {
+                  return token;
+                }
+              } catch (parseError) {
+                if (storedSession.startsWith('eyJ')) {
+                  return storedSession;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error reading auth token from localStorage:', error);
+    }
+    
+    return null;
+  };
+
   const loadClients = async () => {
     try {
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
+      const token = getAuthToken();
       if (!token) {
         setError('Authentication required');
         return;
@@ -150,8 +199,7 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
       setLoading(true);
       setError(null);
       
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
+      const token = getAuthToken();
       if (!token) {
         setError('Authentication required');
         setLoading(false);
@@ -169,7 +217,7 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
       }
 
       const url = `/api/monthly-analytics${params.toString() ? `?${params.toString()}` : ''}`;
-      console.log('[MonthlyAnalytics] Fetching from:', url);
+      logger.debug('Fetching from', { url, component: 'MonthlyAnalyticsTab' });
 
       const response = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -182,7 +230,7 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
       }
 
       const result = await response.json();
-      console.log('[MonthlyAnalytics] API response:', result);
+      logger.debug('API response', { hasData: !!result, component: 'MonthlyAnalyticsTab' });
       
       // Handle both { data: [...] } and direct array responses
       const data = result?.data || result || [];
@@ -194,7 +242,7 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
         return;
       }
 
-      console.log('[MonthlyAnalytics] Loaded records:', data.length);
+      logger.debug('Loaded records', { count: data.length, component: 'MonthlyAnalyticsTab' });
       setRecords(data);
       setError(null);
     } catch (err) {
@@ -236,19 +284,27 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
       setUploading(true);
       setError(null);
 
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
+      logger.info('Starting upload process', { filesCount: selectedFiles.length, clientId: selectedClientId, month: selectedMonth, component: 'MonthlyAnalyticsTab' });
+
+      const token = getAuthToken();
       if (!token) {
-        setError('Authentication required. Please refresh the page and try again.');
+        const errorMsg = 'Authentication required. Please refresh the page and try again.';
+        console.error('[MonthlyAnalytics] No auth token found');
+        setError(errorMsg);
         return;
       }
+
+      logger.debug('Auth token retrieved, creating FormData', { component: 'MonthlyAnalyticsTab' });
 
       const formData = new FormData();
       formData.append('clientId', selectedClientId);
       formData.append('month', selectedMonth);
-      selectedFiles.forEach(file => {
+      selectedFiles.forEach((file, index) => {
         formData.append('files', file);
+        logger.debug(`Added file ${index + 1}`, { fileName: file.name, sizeMB: (file.size / 1024 / 1024).toFixed(2), component: 'MonthlyAnalyticsTab' });
       });
+
+      logger.debug('Sending POST request to /api/monthly-analytics', { component: 'MonthlyAnalyticsTab' });
 
       const response = await fetch('/api/monthly-analytics', {
         method: 'POST',
@@ -256,13 +312,28 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
         body: formData
       });
 
+      logger.debug('Response status', { status: response.status, statusText: response.statusText, component: 'MonthlyAnalyticsTab' });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `Upload failed with status ${response.status}`;
+        let errorMessage = `Upload failed with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          console.error('[MonthlyAnalytics] Error response data:', errorData);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch (parseError) {
+          const errorText = await response.text();
+          console.error('[MonthlyAnalytics] Error response text:', errorText);
+          errorMessage = errorText || errorMessage;
+        }
         throw new Error(errorMessage);
       }
 
-      const result = await response.json().catch(() => ({}));
+      const result = await response.json().catch((parseError) => {
+        console.error('[MonthlyAnalytics] Error parsing response JSON:', parseError);
+        return {};
+      });
+
+      logger.info('Upload successful', { hasResult: !!result, component: 'MonthlyAnalyticsTab' });
       
       // Store values before resetting
       const fileCount = selectedFiles.length;
@@ -276,16 +347,23 @@ export const MonthlyAnalyticsTab: React.FC<MonthlyAnalyticsTabProps> = ({ curren
       if (fileInput) fileInput.value = '';
 
       // Reload analytics
+      logger.debug('Reloading analytics list', { component: 'MonthlyAnalyticsTab' });
       await loadAnalytics();
       
       // Show success message with file count
       alert(`Successfully uploaded ${fileCount} file${fileCount > 1 ? 's' : ''} for ${formatMonth(monthForMessage + '-01')}!`);
     } catch (err) {
-      console.error('Error uploading analytics:', err);
+      console.error('[MonthlyAnalytics] Error uploading analytics:', err);
+      console.error('[MonthlyAnalytics] Error details:', {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        name: err instanceof Error ? err.name : undefined
+      });
       const errorMessage = (err as Error).message || 'Failed to upload analytics. Please try again.';
       setError(errorMessage);
     } finally {
       setUploading(false);
+      logger.debug('Upload process completed', { component: 'MonthlyAnalyticsTab' });
     }
   };
 

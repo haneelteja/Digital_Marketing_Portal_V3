@@ -32,13 +32,25 @@ class Logger {
 
   debug(message: string, context?: LogContext): void {
     if (this.shouldLog('debug')) {
-      console.debug(this.formatMessage('debug', message, context));
+      // Use console.warn for debug in production builds (ESLint only allows warn/error)
+      if (this.isDevelopment) {
+        // eslint-disable-next-line no-console
+        console.debug(this.formatMessage('debug', message, context));
+      } else {
+        console.warn(this.formatMessage('debug', message, context));
+      }
     }
   }
 
   info(message: string, context?: LogContext): void {
     if (this.shouldLog('info')) {
-      console.info(this.formatMessage('info', message, context));
+      // Use console.warn for info in production builds (ESLint only allows warn/error)
+      if (this.isDevelopment) {
+        // eslint-disable-next-line no-console
+        console.info(this.formatMessage('info', message, context));
+      } else {
+        console.warn(this.formatMessage('info', message, context));
+      }
     }
   }
 

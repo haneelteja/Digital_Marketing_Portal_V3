@@ -343,16 +343,24 @@ export async function GET(request: NextRequest) {
 // POST /api/artworks - Create new artwork
 export async function POST(request: NextRequest) {
   try {
+    console.warn('[Artworks API] POST request received');
+    
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('[Artworks API] No authorization header');
       return unauthorized();
     }
 
     const token = authHeader.substring(7);
+    console.warn('[Artworks API] Validating token...');
+    
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !currentUser) {
+      console.error('[Artworks API] Invalid token:', authError);
       return unauthorized('Invalid token');
     }
+
+    console.warn('[Artworks API] User authenticated:', currentUser.id);
 
     // Get user role
     const { data: userData, error: userError } = await supabaseAdmin
@@ -362,15 +370,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !userData) {
+      console.error('[Artworks API] User not found:', userError);
       return unauthorized('User not found');
     }
 
+    console.warn('[Artworks API] User role:', userData.role);
+
     // Only IT_ADMIN and AGENCY_ADMIN can create artworks
     if (userData.role !== 'IT_ADMIN' && userData.role !== 'AGENCY_ADMIN') {
+      console.error('[Artworks API] Forbidden: User role is', userData.role);
       return forbidden('Only IT Admin and Agency Admin can create artworks');
     }
 
     const body = await request.json();
+    console.warn('[Artworks API] Request body received');
 
     // Validate required fields
     const requiredFields = [
@@ -381,11 +394,21 @@ export async function POST(request: NextRequest) {
       'outputFormats', 'maxFileSize', 'version'
     ];
 
+    console.warn('[Artworks API] Validating required fields...');
+    const missingFields: string[] = [];
+    
     for (const field of requiredFields) {
       if (body[field] === undefined || body[field] === null || body[field] === '') {
-        return badRequest(`Missing required field: ${field}`);
+        missingFields.push(field);
       }
     }
+
+    if (missingFields.length > 0) {
+      console.error('[Artworks API] Missing required fields:', missingFields);
+      return badRequest(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    console.warn('[Artworks API] All required fields present');
 
     // Validate client access for AGENCY_ADMIN
     if (userData.role === 'AGENCY_ADMIN') {
@@ -408,6 +431,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform to database format
+    console.warn('[Artworks API] Transforming data to database format...');
     const artworkData = {
       artwork_type: body.artworkType,
       artwork_title: body.artworkTitle,
@@ -464,7 +488,10 @@ export async function POST(request: NextRequest) {
       created_by: currentUser.id,
     };
 
-      const { data: record, error: dbError } = await supabaseAdmin
+    console.warn('[Artworks API] Inserting artwork into database...');
+    console.warn('[Artworks API] Artwork data:', JSON.stringify(artworkData, null, 2));
+
+    const { data: record, error: dbError } = await supabaseAdmin
       .from('artworks')
       .insert([artworkData])
       .select('*')
@@ -472,8 +499,11 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       console.error('[Artworks API] Database insert error:', dbError);
+      console.error('[Artworks API] Database error details:', JSON.stringify(dbError, null, 2));
       return serverError(`Failed to create artwork: ${dbError.message || JSON.stringify(dbError)}`);
     }
+
+    console.warn('[Artworks API] Artwork created successfully! ID:', record?.id);
 
     // Get creator name
     let createdByName = 'Unknown';
@@ -514,4 +544,5 @@ export async function POST(request: NextRequest) {
     return serverError(`Internal server error: ${errorMessage}`);
   }
 }
+
 

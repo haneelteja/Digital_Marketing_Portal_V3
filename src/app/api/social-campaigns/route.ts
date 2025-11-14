@@ -95,13 +95,40 @@ export async function GET(request: NextRequest) {
       return serverError('Failed to fetch campaigns');
     }
 
+    // Get unique client IDs from campaigns
+    const clientIds = [...new Set((campaigns || []).map((c: SocialMediaCampaign) => c.client_id).filter(Boolean))];
+    
+    // Fetch client information
+    let clientMap = new Map<string, { id: string; company_name: string }>();
+    if (clientIds.length > 0) {
+      const { data: clientData } = await supabaseAdmin
+        .from('clients')
+        .select('id, company_name')
+        .in('id', clientIds);
+      
+      if (clientData) {
+        clientData.forEach((client: { id: string; company_name: string }) => {
+          clientMap.set(client.id, client);
+        });
+      }
+    }
+
+    // Enhance campaigns with client names
+    const enhancedCampaigns = (campaigns || []).map((campaign: SocialMediaCampaign) => {
+      const client = campaign.client_id ? clientMap.get(campaign.client_id) : null;
+      return {
+        ...campaign,
+        client_name: client?.company_name || null,
+      };
+    });
+
     logger.info('Campaigns fetched successfully', {
       component: 'GET /api/social-campaigns',
       userId: currentUser.id,
-      count: campaigns?.length || 0,
+      count: enhancedCampaigns.length,
     });
 
-    return ok({ data: campaigns || [] });
+    return ok({ data: enhancedCampaigns });
   } catch (error) {
     logger.error('Error in GET /api/social-campaigns', error, {
       component: 'GET /api/social-campaigns',

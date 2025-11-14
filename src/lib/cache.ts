@@ -27,7 +27,8 @@ redis.on('error', (err) => {
 });
 
 redis.on('connect', () => {
-  console.log('Redis Client Connected');
+  // Redis connection successful - using console.warn as logger may not be initialized yet
+  console.warn('Redis Client Connected');
 });
 
 export class CacheService {

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
 import { User, Client } from '../../types/user';
 import ExcelJS from 'exceljs';
 import { ArtworkDetailView } from './ArtworkDetailView';
@@ -333,12 +332,18 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
       setSaving(true);
       setError(null);
 
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
+      console.warn('[ArtWorks] Starting artwork creation...');
+      console.warn('[ArtWorks] Form data:', formData);
+
+      const token = getAuthToken();
       if (!token) {
-        setError('Authentication required');
+        const errorMsg = 'Authentication required. Please refresh the page and try again.';
+        console.error('[ArtWorks] No auth token found');
+        setError(errorMsg);
         return;
       }
+
+      console.warn('[ArtWorks] Auth token retrieved, preparing payload...');
 
       // Prepare data for API
       const payload = {
@@ -357,6 +362,9 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
         designerOwner: formData.designerOwner || currentUser.id,
       };
 
+      console.warn('[ArtWorks] Payload prepared:', payload);
+      console.warn('[ArtWorks] Sending POST request to /api/artworks...');
+
       const response = await fetch('/api/artworks', {
         method: 'POST',
         headers: {
@@ -366,13 +374,17 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
         body: JSON.stringify(payload)
       });
 
+      console.warn('[ArtWorks] Response status:', response.status, response.statusText);
+
       if (!response.ok) {
         let errorMessage = `Failed to save artwork: ${response.status}`;
         try {
           const errorData = await response.json();
+          console.error('[ArtWorks] Error response data:', errorData);
           errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {
+        } catch (parseError) {
           const errorText = await response.text().catch(() => '');
+          console.error('[ArtWorks] Error response text:', errorText);
           if (errorText) {
             try {
               const parsed = JSON.parse(errorText);
@@ -385,16 +397,30 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
         throw new Error(errorMessage);
       }
 
+      const result = await response.json().catch((parseError) => {
+        console.error('[ArtWorks] Error parsing response JSON:', parseError);
+        return {};
+      });
+
+      console.warn('[ArtWorks] Artwork created successfully! Response:', result);
+
       // Reset form and reload
       resetForm();
+      console.warn('[ArtWorks] Reloading artworks list...');
       await loadArtworks();
       alert('Artwork created successfully!');
     } catch (err) {
-      console.error('Error saving artwork:', err);
+      console.error('[ArtWorks] Error saving artwork:', err);
+      console.error('[ArtWorks] Error details:', {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        name: err instanceof Error ? err.name : undefined
+      });
       const errorMessage = err instanceof Error ? err.message : 'Failed to save artwork';
       setError(errorMessage);
     } finally {
       setSaving(false);
+      console.warn('[ArtWorks] Artwork creation process completed');
     }
   };
 
@@ -1049,14 +1075,12 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
                     Title {sortField === 'artworkTitle' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  {currentUser.role !== 'CLIENT' && (
-                    <th
-                      onClick={() => handleSort('campaignClient')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                    >
-                      Client {sortField === 'campaignClient' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                  )}
+                  <th
+                    onClick={() => handleSort('campaignClient')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  >
+                    Client {sortField === 'campaignClient' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th
                     onClick={() => handleSort('approvalStatus')}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -1069,8 +1093,6 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
                   >
                     Deadline {sortField === 'deadline' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designer</th>
                   {currentUser.role !== 'CLIENT' && (
                     <th
                       onClick={() => handleSort('createdAt')}
@@ -1097,11 +1119,12 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {record.artworkType}
                     </td>
-                    {currentUser.role !== 'CLIENT' && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {record.campaignClient}
-                      </td>
-                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {(() => {
+                        const client = clients.find(c => c.id === record.campaignClient || c.companyName === record.campaignClient || c.company_name === record.campaignClient);
+                        return client?.companyName || client?.company_name || record.campaignClient || 'N/A';
+                      })()}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                         record.approvalStatus === 'Approved' ? 'bg-green-100 text-green-800' :
@@ -1114,12 +1137,6 @@ export const ArtWorksTab: React.FC<ArtWorksTabProps> = ({ currentUser }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(record.deadline).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {record.priority || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {record.designerOwner}
                     </td>
                     {currentUser.role !== 'CLIENT' && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

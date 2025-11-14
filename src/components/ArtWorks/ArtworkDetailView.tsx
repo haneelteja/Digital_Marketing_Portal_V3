@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Client } from '../../types/user';
+import { logger } from '@/utils/logger';
 
 type ArtworkRecord = {
   id: string;
@@ -75,7 +76,7 @@ export const ArtworkDetailView: React.FC<ArtworkDetailViewProps> = ({ artwork, c
 
     try {
       setLoading(true);
-      console.log('[loadUploads] Starting to load uploads for artwork:', artwork.id);
+      logger.debug('Starting to load uploads for artwork', { artworkId: artwork.id, component: 'ArtworkDetailView.loadUploads' });
       
       // Get auth token from localStorage
       const getAuthToken = (): string | null => {
@@ -540,71 +541,91 @@ export const ArtworkDetailView: React.FC<ArtworkDetailViewProps> = ({ artwork, c
 
                     {/* Upload Area */}
                     <div className="mb-3">
-                      <label 
-                        className="block cursor-pointer"
-                        onClick={() => {
-                          if (!isUploading) {
-                            const fileInput = document.getElementById(`artwork-file-input-${option}`) as HTMLInputElement;
-                            if (fileInput) fileInput.click();
-                          }
-                        }}
-                      >
-                        <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                          hasUpload ? 'border-gray-300 bg-gray-50 hover:border-indigo-400 hover:bg-indigo-50' : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
-                        }`}>
-                          {uploadState.preview ? (
-                            <div className="space-y-2">
-                              {(uploadState.fileType?.startsWith('image/') || uploadState.file?.type.startsWith('image/')) ? (
-                                <img 
-                                  src={uploadState.preview} 
-                                  alt="Preview" 
-                                  className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPreviewUrl(uploadState.preview);
-                                    setPreviewType('image');
-                                    setImageZoom(1);
-                                    setImagePosition({ x: 0, y: 0 });
-                                    setShowPreviewModal(true);
-                                  }}
-                                />
-                              ) : (
-                                <video 
-                                  src={uploadState.preview} 
-                                  className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
-                                  controls
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPreviewUrl(uploadState.preview);
-                                    setPreviewType('video');
-                                    setShowPreviewModal(true);
-                                  }}
-                                />
-                              )}
-                              <p className="text-xs text-gray-500">{uploadState.file?.name || 'Uploaded file'}</p>
-                              <p className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                                Click to change or click image to preview
-                              </p>
-                            </div>
-                          ) : (
-                            <div>
-                              <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                              </svg>
-                              <p className="mt-2 text-sm text-gray-600">Click to upload</p>
-                              <p className="text-xs text-gray-400">Image or Video</p>
-                            </div>
-                          )}
+                      {hasUpload ? (
+                        // Show preview when upload exists
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+                          <div className="space-y-2">
+                            {(uploadState.fileType?.startsWith('image/') || uploadState.file?.type.startsWith('image/')) ? (
+                              <img 
+                                src={uploadState.preview} 
+                                alt="Preview" 
+                                className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
+                                onClick={() => {
+                                  setPreviewUrl(uploadState.preview);
+                                  setPreviewType('image');
+                                  setImageZoom(1);
+                                  setImagePosition({ x: 0, y: 0 });
+                                  setShowPreviewModal(true);
+                                }}
+                                title="Click to preview full size"
+                              />
+                            ) : (
+                              <video 
+                                src={uploadState.preview} 
+                                className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
+                                controls
+                                onClick={() => {
+                                  setPreviewUrl(uploadState.preview);
+                                  setPreviewType('video');
+                                  setImageZoom(1);
+                                  setImagePosition({ x: 0, y: 0 });
+                                  setShowPreviewModal(true);
+                                }}
+                                title="Click to preview full size"
+                              />
+                            )}
+                            <p className="text-xs text-gray-500">{uploadState.file?.name || 'Uploaded file'}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!isUploading) {
+                                  const fileInput = document.getElementById(`artwork-file-input-${option}`) as HTMLInputElement;
+                                  if (fileInput) fileInput.click();
+                                }
+                              }}
+                              disabled={isUploading}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline hover:no-underline transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+                            >
+                              {isUploading ? 'Uploading...' : 'Upload New / Change'}
+                            </button>
+                          </div>
+                          <input
+                            id={`artwork-file-input-${option}`}
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={(e) => handleFileUpload(option, e)}
+                            className="hidden"
+                            disabled={isUploading}
+                          />
                         </div>
-                        <input
-                          id={`artwork-file-input-${option}`}
-                          type="file"
-                          accept="image/*,video/*"
-                          onChange={(e) => handleFileUpload(option, e)}
-                          className="hidden"
-                          disabled={isUploading}
-                        />
-                      </label>
+                      ) : (
+                        // Show upload area when no upload exists
+                        <label 
+                          className="block cursor-pointer"
+                          onClick={() => {
+                            if (!isUploading) {
+                              const fileInput = document.getElementById(`artwork-file-input-${option}`) as HTMLInputElement;
+                              if (fileInput) fileInput.click();
+                            }
+                          }}
+                        >
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors hover:border-indigo-400 hover:bg-indigo-50">
+                            <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p className="mt-2 text-sm text-gray-600">Click to upload</p>
+                            <p className="text-xs text-gray-400">Image or Video</p>
+                          </div>
+                          <input
+                            id={`artwork-file-input-${option}`}
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={(e) => handleFileUpload(option, e)}
+                            className="hidden"
+                            disabled={isUploading}
+                          />
+                        </label>
+                      )}
                       {isUploading && (
                         <div className="mt-2 text-center">
                           <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-indigo-600 border-t-transparent"></div>

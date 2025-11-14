@@ -7,6 +7,7 @@ import { useClientCache } from '../ClientCacheProvider';
 import { ErrorHandler } from '../../utils/errorHandler';
 import { useDebounce } from '../../hooks/useDebounce';
 import { apiClient } from '../../utils/apiClient';
+import { logger } from '@/utils/logger';
 
 interface SocialMediaCampaign {
   id: string;
@@ -19,6 +20,7 @@ interface SocialMediaCampaign {
   assigned_users: string[];
   status: 'draft' | 'active' | 'completed' | 'cancelled';
   client_id: string | null;
+  client_name?: string | null; // Added from API
   description: string | null;
   created_by: string | null;
   created_at: string;
@@ -146,7 +148,7 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
 
     try {
       setError(null);
-      console.log('[loadCampaigns] Starting to load campaigns...');
+      logger.debug('Starting to load campaigns', { component: 'SocialMediaCampaignsTab.loadCampaigns' });
 
       const response = await apiClient.get<any>('/api/social-campaigns', {
         signal: controller.signal,
@@ -154,7 +156,7 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
         retries: 0,
       });
 
-      console.log('[loadCampaigns] API response received:', response);
+      logger.debug('API response received', { hasResponse: !!response, component: 'SocialMediaCampaignsTab.loadCampaigns' });
 
       // Check if request was aborted
       if (controller.signal.aborted) {
@@ -176,8 +178,7 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
         }
       }
       
-      console.log('[loadCampaigns] Processed campaigns data:', campaignsData);
-      console.log('[loadCampaigns] Number of campaigns:', campaignsData.length);
+      logger.debug('Processed campaigns data', { count: campaignsData.length, component: 'SocialMediaCampaignsTab.loadCampaigns' });
       setCampaigns(campaignsData);
     } catch (err) {
       // Check if request was aborted
@@ -200,7 +201,7 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
       clearTimeout(safetyTimeout);
       // Always set loading to false, unless request was aborted
       if (!controller.signal.aborted) {
-        console.log('[loadCampaigns] Setting loading to false');
+        logger.debug('Setting loading to false', { component: 'SocialMediaCampaignsTab.loadCampaigns' });
         setLoading(false);
       }
     }
@@ -284,25 +285,24 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
         description: formData.description.trim() || null,
       };
 
-      console.log('Submitting campaign:', { editingCampaign: !!editingCampaign, campaignPayload });
+      logger.info('Submitting campaign', { isEdit: !!editingCampaign, campaignId: editingCampaign?.id, component: 'SocialMediaCampaignsTab' });
       
       let response;
       try {
         if (editingCampaign) {
-          console.log('Updating campaign:', editingCampaign.id);
+          logger.debug('Updating campaign', { campaignId: editingCampaign.id, component: 'SocialMediaCampaignsTab' });
           response = await apiClient.put(`/api/social-campaigns/${editingCampaign.id}`, campaignPayload, {
             timeout: 30000,
             retries: 0,
           });
-          console.log('Campaign updated successfully:', response);
+          logger.info('Campaign updated successfully', { campaignId: editingCampaign.id, component: 'SocialMediaCampaignsTab' });
         } else {
-          console.log('Creating new campaign...');
-          console.log('Campaign payload:', JSON.stringify(campaignPayload, null, 2));
+          logger.debug('Creating new campaign', { component: 'SocialMediaCampaignsTab' });
           response = await apiClient.post('/api/social-campaigns', campaignPayload, {
             timeout: 30000,
             retries: 0,
           });
-          console.log('Campaign created successfully:', response);
+          logger.info('Campaign created successfully', { hasResponse: !!response, component: 'SocialMediaCampaignsTab' });
         }
 
         // Verify response is valid
@@ -411,10 +411,19 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
     }
   };
 
-  const getClientName = (clientId: string | null) => {
-    if (!clientId) return 'N/A';
-    const client = clientCache.find(c => c.id === clientId);
-    return client?.companyName || client?.company_name || 'Unknown Client';
+  const getClientName = (campaign: SocialMediaCampaign) => {
+    // First try to use client_name from API response
+    if (campaign.client_name) {
+      return campaign.client_name;
+    }
+    // Fallback to clientCache lookup
+    if (campaign.client_id) {
+      const client = clientCache.find(c => c.id === campaign.client_id);
+      if (client) {
+        return client.companyName || client.company_name || 'Unknown Client';
+      }
+    }
+    return 'Unknown Client';
   };
 
   const getUserName = (userId: string) => {
@@ -803,12 +812,12 @@ export const SocialMediaCampaignsTab: React.FC<SocialMediaCampaignsTabProps> = (
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{campaign.campaign_name}</div>
                       <div className="text-xs text-gray-500 sm:hidden">
-                        <div>Client: {getClientName(campaign.client_id)}</div>
+                        <div>Client: {getClientName(campaign)}</div>
                         <div>{new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}</div>
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
-                      {getClientName(campaign.client_id)}
+                      {getClientName(campaign)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
                       {new Date(campaign.start_date).toLocaleDateString()}
@@ -940,13 +949,22 @@ const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({ campaign, curre
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  const getClientName = (clientId: string | null) => {
-    if (!clientId) return 'No Client';
-    const client = clientCache.find(c => c.id === clientId);
-    return client?.companyName || client?.company_name || 'Unknown Client';
+  const getClientName = (campaign: SocialMediaCampaign) => {
+    // First try to use client_name from API response
+    if (campaign.client_name) {
+      return campaign.client_name;
+    }
+    // Fallback to clientCache lookup
+    if (campaign.client_id) {
+      const client = clientCache.find(c => c.id === campaign.client_id);
+      if (client) {
+        return client.companyName || client.company_name || 'Unknown Client';
+      }
+    }
+    return 'Unknown Client';
   };
 
-  const clientName = getClientName(campaign.client_id);
+  const clientName = getClientName(campaign);
 
   const canApprove = currentUser.role === 'IT_ADMIN' || currentUser.role === 'AGENCY_ADMIN' || currentUser.role === 'CLIENT';
 
@@ -965,19 +983,19 @@ const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({ campaign, curre
 
     try {
       setLoading(true);
-      console.log('[loadUploads] Starting to load uploads for campaign:', campaign.id);
+      logger.debug('Starting to load uploads for campaign', { campaignId: campaign.id, component: 'SocialMediaCampaignsTab.loadUploads' });
       
       const data = await apiClient.get<any>(`/api/campaign-uploads?campaignId=${campaign.id}`, {
         timeout: 15000,
         retries: 0,
       });
       
-      console.log('[loadUploads] API response received:', data);
+      logger.debug('API response received', { hasData: !!data, component: 'SocialMediaCampaignsTab.loadUploads' });
       
       // Handle different response structures
       const uploads = Array.isArray(data) ? data : (data?.data || []);
       
-      console.log('[loadUploads] Processed uploads:', uploads);
+      logger.debug('Processed uploads', { count: uploads.length, component: 'SocialMediaCampaignsTab.loadUploads' });
       
       const states: typeof uploadStates = {
         'Option 1': { file: null, preview: null, fileType: null, approved: false, description: '', comments: [] },
@@ -1002,7 +1020,7 @@ const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({ campaign, curre
       }
 
       setUploadStates(states);
-      console.log('[loadUploads] Upload states set:', states);
+      logger.debug('Upload states set', { statesCount: Object.keys(states).length, component: 'SocialMediaCampaignsTab.loadUploads' });
     } catch (err) {
       console.error('[loadUploads] Error loading uploads:', err);
       // Initialize empty states on error (this is normal if no uploads exist yet)
@@ -1013,7 +1031,7 @@ const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({ campaign, curre
     } finally {
       clearTimeout(safetyTimeout);
       // Always clear loading state
-      console.log('[loadUploads] Setting loading to false');
+      logger.debug('Setting loading to false', { component: 'SocialMediaCampaignsTab.loadUploads' });
       setLoading(false);
     }
   };
@@ -1520,75 +1538,91 @@ const CampaignDetailView: React.FC<CampaignDetailViewProps> = ({ campaign, curre
 
                   {/* Upload Area */}
                   <div className="mb-3">
-                    <label 
-                      className="block cursor-pointer"
-                      onClick={() => {
-                        if (!isUploading) {
-                          const fileInput = document.getElementById(`file-input-${option}`) as HTMLInputElement;
-                          if (fileInput) {
-                            fileInput.click();
-                          }
-                        }
-                      }}
-                    >
-                      <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
-                        hasUpload ? 'border-gray-300 bg-gray-50 hover:border-indigo-400 hover:bg-indigo-50' : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'
-                      }`}>
-                        {uploadState.preview ? (
-                          <div className="space-y-2">
-                            {(uploadState.fileType?.startsWith('image/') || uploadState.file?.type.startsWith('image/')) ? (
-                              <img 
-                                src={uploadState.preview} 
-                                alt="Preview" 
-                                className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewUrl(uploadState.preview);
-                                  setPreviewType('image');
-                                  setImageZoom(1);
-                                  setImagePosition({ x: 0, y: 0 });
-                                  setShowPreviewModal(true);
-                                }}
-                              />
-                            ) : (
-                              <video 
-                                src={uploadState.preview} 
-                                className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
-                                controls
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPreviewUrl(uploadState.preview);
-                                  setPreviewType('video');
-                                  setImageZoom(1);
-                                  setImagePosition({ x: 0, y: 0 });
-                                  setShowPreviewModal(true);
-                                }}
-                              />
-                            )}
-                            <p className="text-xs text-gray-500">{uploadState.file?.name || 'Uploaded file'}</p>
-                            <p className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                              Click to change or click image to preview
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <p className="mt-2 text-sm text-gray-600">Click to upload</p>
-                            <p className="text-xs text-gray-400">Image or Video</p>
-                          </div>
-                        )}
+                    {hasUpload ? (
+                      // Show preview when upload exists
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+                        <div className="space-y-2">
+                          {(uploadState.fileType?.startsWith('image/') || uploadState.file?.type.startsWith('image/')) ? (
+                            <img 
+                              src={uploadState.preview} 
+                              alt="Preview" 
+                              className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
+                              onClick={() => {
+                                setPreviewUrl(uploadState.preview);
+                                setPreviewType('image');
+                                setImageZoom(1);
+                                setImagePosition({ x: 0, y: 0 });
+                                setShowPreviewModal(true);
+                              }}
+                              title="Click to preview full size"
+                            />
+                          ) : (
+                            <video 
+                              src={uploadState.preview} 
+                              className="max-h-32 mx-auto rounded cursor-pointer hover:opacity-80 transition-opacity" 
+                              controls
+                              onClick={() => {
+                                setPreviewUrl(uploadState.preview);
+                                setPreviewType('video');
+                                setImageZoom(1);
+                                setImagePosition({ x: 0, y: 0 });
+                                setShowPreviewModal(true);
+                              }}
+                              title="Click to preview full size"
+                            />
+                          )}
+                          <p className="text-xs text-gray-500">{uploadState.file?.name || 'Uploaded file'}</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!isUploading) {
+                                const fileInput = document.getElementById(`file-input-${option}`) as HTMLInputElement;
+                                if (fileInput) fileInput.click();
+                              }
+                            }}
+                            disabled={isUploading}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline hover:no-underline transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+                          >
+                            {isUploading ? 'Uploading...' : 'Upload New / Change'}
+                          </button>
+                        </div>
+                        <input
+                          id={`file-input-${option}`}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={(e) => handleFileUpload(option, e)}
+                          className="hidden"
+                          disabled={isUploading}
+                        />
                       </div>
-                      <input
-                        id={`file-input-${option}`}
-                        type="file"
-                        accept="image/*,video/*"
-                        onChange={(e) => handleFileUpload(option, e)}
-                        className="hidden"
-                        disabled={isUploading}
-                      />
-                    </label>
+                    ) : (
+                      // Show upload area when no upload exists
+                      <label 
+                        className="block cursor-pointer"
+                        onClick={() => {
+                          if (!isUploading) {
+                            const fileInput = document.getElementById(`file-input-${option}`) as HTMLInputElement;
+                            if (fileInput) fileInput.click();
+                          }
+                        }}
+                      >
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center transition-colors hover:border-indigo-400 hover:bg-indigo-50">
+                          <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <p className="mt-2 text-sm text-gray-600">Click to upload</p>
+                          <p className="text-xs text-gray-400">Image or Video</p>
+                        </div>
+                        <input
+                          id={`file-input-${option}`}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={(e) => handleFileUpload(option, e)}
+                          className="hidden"
+                          disabled={isUploading}
+                        />
+                      </label>
+                    )}
                     {isUploading && (
                       <div className="mt-2 text-center">
                         <div className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-indigo-600 border-t-transparent"></div>

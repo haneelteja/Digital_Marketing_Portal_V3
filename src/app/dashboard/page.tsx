@@ -1235,7 +1235,7 @@ useEffect(() => {
 	}
 
 	return (
-		<div className="portal-main-wrapper flex flex-col md:flex-row min-h-screen w-full overflow-hidden bg-gray-50" suppressHydrationWarning>
+		<div className="portal-main-wrapper flex flex-col md:flex-row min-h-screen w-full overflow-hidden bg-gray-50" suppressHydrationWarning style={{ margin: 0, padding: 0 }}>
 			{/* Mobile Sidebar Overlay */}
 			{sidebarOpen && (
 				<div 
@@ -1244,9 +1244,11 @@ useEffect(() => {
 				></div>
 			)}
 
-			{/* Sidebar - Always visible on desktop, hidden on mobile until opened */}
+			{/* Sidebar - Always visible on desktop, overlay on mobile */}
 			<aside
-				className={`portal-sidebar fixed md:fixed inset-y-0 left-0 z-50 ${sidebarCollapsed ? 'w-16' : 'w-64'} h-screen md:h-screen transform ${
+				className={`portal-sidebar fixed inset-y-0 left-0 z-50 ${sidebarCollapsed ? 'w-16' : 'w-64'} h-screen transform ${
+					// On mobile: completely hidden when closed, overlay when open
+					// On desktop: always visible
 					sidebarOpen ? 'translate-x-0 open' : '-translate-x-full md:translate-x-0'
 				} transition-all duration-300 ease-in-out
 				border-r border-indigo-200/50 bg-gradient-to-b from-indigo-50 via-indigo-100/80 to-purple-50 shadow-xl md:shadow-2xl flex flex-col flex-shrink-0 top-0`
@@ -1289,7 +1291,7 @@ useEffect(() => {
 					)}
 				</div>
 				
-                <nav className="portal-nav-container flex-1 px-4 pb-4 pt-1 space-y-1.5 overflow-y-auto overflow-x-hidden" onClick={() => setSidebarOpen(false)} style={{ scrollBehavior: 'smooth' }}>
+                <nav className="portal-nav-container flex-1 px-4 pb-4 pt-1 space-y-1.5 overflow-y-auto overflow-x-hidden" style={{ scrollBehavior: 'smooth' }}>
                     {/* 1. Dashboard */}
                     <div className="group relative">
                         <button 
@@ -1298,13 +1300,15 @@ useEffect(() => {
                                 setShowDetailsView(false);
                                 setDetailsDate('');
                                 setDetailsEntries([]);
+                                // Close sidebar on mobile when navigating
+                                setSidebarOpen(false);
                             }} 
                             className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                 view === 'dashboard' 
                                     ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                     : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                             }`}
-                            title={sidebarCollapsed ? "Dashboard (1)" : undefined}
+                            title={sidebarCollapsed ? "Dashboard" : undefined}
                         >
                             {view === 'dashboard' && (
                                 <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1313,12 +1317,10 @@ useEffect(() => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'dashboard' ? 2.5 : 2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             {!sidebarCollapsed && <span className="truncate">Dashboard</span>}
-                            {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">1</span>}
                         </button>
                         {sidebarCollapsed && (
                             <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                 Dashboard
-                                <span className="ml-2 text-gray-400">(1)</span>
                             </div>
                         )}
                     </div>
@@ -1327,13 +1329,17 @@ useEffect(() => {
                     {((currentUser?.role ?? user?.role) !== 'DESIGNER') && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('add')} 
+                                onClick={() => {
+                                    setView('add');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'add' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "Add Client-Post (2)" : undefined}
+                                title={sidebarCollapsed ? "Add Client-Post" : undefined}
                             >
                                 {view === 'add' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1342,12 +1348,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'add' ? 2.5 : 2} d="M12 4v16m8-8H4" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">Add Client-Post</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">2</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     Add Client-Post
-                                    <span className="ml-2 text-gray-400">(2)</span>
                                 </div>
                             )}
                         </div>
@@ -1360,13 +1364,17 @@ useEffect(() => {
                       (currentUser?.role ?? user?.role) === 'DESIGNER') && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('social-campaigns')} 
+                                onClick={() => {
+                                    setView('social-campaigns');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'social-campaigns' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "Social Media Campaigns (3)" : undefined}
+                                title={sidebarCollapsed ? "Social Media Campaigns" : undefined}
                             >
                                 {view === 'social-campaigns' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1375,12 +1383,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'social-campaigns' ? 2.5 : 2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1z" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">Social Media Campaigns</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">3</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     Social Media Campaigns
-                                    <span className="ml-2 text-gray-400">(3)</span>
                                 </div>
                             )}
                         </div>
@@ -1392,13 +1398,17 @@ useEffect(() => {
                       (currentUser?.role ?? user?.role) === 'CLIENT') && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('artworks')} 
+                                onClick={() => {
+                                    setView('artworks');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'artworks' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "Art Works (4)" : undefined}
+                                title={sidebarCollapsed ? "Art Works" : undefined}
                             >
                                 {view === 'artworks' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1407,12 +1417,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'artworks' ? 2.5 : 2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">Art Works</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">4</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     Art Works
-                                    <span className="ml-2 text-gray-400">(4)</span>
                                 </div>
                             )}
                         </div>
@@ -1424,13 +1432,17 @@ useEffect(() => {
                       (currentUser?.role ?? user?.role) === 'CLIENT') && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('monthly-analytics')} 
+                                onClick={() => {
+                                    setView('monthly-analytics');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'monthly-analytics' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "Monthly Analytics (5)" : undefined}
+                                title={sidebarCollapsed ? "Monthly Analytics" : undefined}
                             >
                                 {view === 'monthly-analytics' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1439,12 +1451,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'monthly-analytics' ? 2.5 : 2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">Monthly Analytics</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">5</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     Monthly Analytics
-                                    <span className="ml-2 text-gray-400">(5)</span>
                                 </div>
                             )}
                         </div>
@@ -1454,13 +1464,17 @@ useEffect(() => {
                     {(currentUser?.role ?? user?.role) === 'IT_ADMIN' && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('configurations')} 
+                                onClick={() => {
+                                    setView('configurations');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'configurations' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "Configurations (6)" : undefined}
+                                title={sidebarCollapsed ? "Configurations" : undefined}
                             >
                                 {view === 'configurations' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1470,12 +1484,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'configurations' ? 2.5 : 2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">Configurations</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">6</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     Configurations
-                                    <span className="ml-2 text-gray-400">(6)</span>
                                 </div>
                             )}
                         </div>
@@ -1485,13 +1497,17 @@ useEffect(() => {
                     {(currentUser?.role ?? user?.role) === 'IT_ADMIN' && (
                         <div className="group relative">
                             <button 
-                                onClick={() => setView('users')} 
+                                onClick={() => {
+                                    setView('users');
+                                    // Close sidebar on mobile when navigating
+                                    setSidebarOpen(false);
+                                }} 
                                 className={`w-full text-left ${sidebarCollapsed ? 'px-2 justify-center' : 'px-3'} py-2.5 rounded-lg font-medium text-sm transition-all flex items-center gap-3 whitespace-nowrap relative ${
                                     view === 'users' 
                                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/50' 
                                         : 'text-indigo-700 hover:bg-indigo-100/70 bg-white/60 backdrop-blur-sm border border-indigo-200/50 hover:border-indigo-300 hover:shadow-md'
                                 }`}
-                                title={sidebarCollapsed ? "User Management (7)" : undefined}
+                                title={sidebarCollapsed ? "User Management" : undefined}
                             >
                                 {view === 'users' && (
                                     <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-400 to-purple-400 rounded-r-full animate-slide-in shadow-lg"></span>
@@ -1500,12 +1516,10 @@ useEffect(() => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={view === 'users' ? 2.5 : 2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                                 </svg>
                                 {!sidebarCollapsed && <span className="truncate">User Management</span>}
-                                {!sidebarCollapsed && <span className="ml-auto text-xs text-gray-400">7</span>}
                             </button>
                             {sidebarCollapsed && (
                                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                     User Management
-                                    <span className="ml-2 text-gray-400">(7)</span>
                                 </div>
                             )}
                         </div>
@@ -1556,31 +1570,33 @@ useEffect(() => {
 						</div>
 						<div className="p-2 max-h-96 overflow-y-auto">
 							<p className="text-sm text-gray-500 p-4 text-center">Search functionality coming soon...</p>
-							<p className="text-xs text-gray-400 p-2 text-center">Use number keys (1-7) for quick navigation</p>
 						</div>
 					</div>
 				</div>
 			)}
 
-			{/* Main Content Area */}
-			<main className="portal-main-content flex-1 min-w-0 overflow-x-hidden bg-gray-50" style={{
-				marginLeft: sidebarCollapsed ? '64px' : '256px',
-				width: sidebarCollapsed ? 'calc(100% - 64px)' : 'calc(100% - 256px)',
-				transition: 'margin-left 0.3s ease-in-out, width 0.3s ease-in-out'
-			}}>
-				{/* Mobile Header with Hamburger */}
-				<div className="md:hidden mb-4 flex items-center justify-between bg-white p-4 rounded-lg shadow-sm mx-4 mt-4">
+			{/* Main Content Area - Full width on mobile, with margin on desktop */}
+			<main className={`portal-main-content w-full md:flex-1 min-w-0 overflow-x-hidden bg-gray-50 transition-all duration-300 ${
+				// On mobile: full width (w-full)
+				// On desktop: margin based on sidebar collapsed state
+				'md:ml-64 md:w-[calc(100%-256px)]'
+			} ${sidebarCollapsed ? 'md:ml-16 md:w-[calc(100%-64px)]' : ''}`}>
+				{/* Mobile Header with Hamburger - Always visible on mobile, positioned at top-left */}
+				<div className="md:hidden sticky top-0 z-30 flex items-center justify-between bg-white border-b border-gray-200 px-4 py-3 shadow-sm">
 					<button
 						onClick={() => setSidebarOpen(true)}
-						className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+						className="touch-target p-2 text-gray-700 hover:text-indigo-600 rounded-lg hover:bg-gray-100 active:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
 						aria-label="Open sidebar"
+						title="Open menu"
 					>
 						<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
 						</svg>
 					</button>
-					<h1 className="text-lg font-bold">Marketing Portal</h1>
-					<div className="w-10"></div>
+					<h1 className="text-lg font-bold text-gray-900 flex-1 text-center">Marketing Portal</h1>
+					<div className="w-10 flex items-center justify-end">
+						<NotificationsBell />
+					</div>
 				</div>
 				{/* Content Container with proper margins and max-width */}
 				<div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

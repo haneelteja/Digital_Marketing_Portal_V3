@@ -256,6 +256,8 @@ textarea:focus-visible,
   flex: 1;
   min-width: 0;
   width: 100%;
+  margin-left: 0; /* No margin on mobile */
+  padding: 0; /* No padding on mobile */
 }
 
 @media (min-width: 768px) {
@@ -494,15 +496,25 @@ textarea:focus-visible,
     min-width: 120px;
   }
   
-  /* Sidebar becomes overlay on mobile */
+  /* Sidebar becomes overlay on mobile - completely hidden when closed */
   .portal-sidebar {
     position: fixed;
     z-index: 50;
     transform: translateX(-100%);
+    /* Sidebar is fixed, so it doesn't take space in layout */
   }
   
   .portal-sidebar.open {
     transform: translateX(0);
+    /* Width is set by Tailwind classes (w-64 = 256px) */
+  }
+  
+  /* Main content full width on mobile - no margin/padding from sidebar */
+  .portal-main-content {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    max-width: 100% !important;
   }
 }
 

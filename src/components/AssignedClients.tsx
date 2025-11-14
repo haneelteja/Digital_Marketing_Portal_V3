@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User } from '../types/user';
 import { supabase } from '../../lib/supabaseClient';
 import { useClientCache } from './ClientCacheProvider';
+import { logger } from '@/utils/logger';
 
 interface AssignedClientsProps {
   currentUser: User | null;
@@ -91,7 +92,7 @@ export const AssignedClients: React.FC<AssignedClientsProps> = ({ currentUser, e
     if (currentUser.role === 'IT_ADMIN') {
       const safeClientCache = Array.isArray(clientCache) ? clientCache : [];
       const allClientIds = safeClientCache.map(c => c.id).filter(Boolean);
-      console.log('[AssignedClients] IT_ADMIN - showing all clients:', allClientIds.length);
+      logger.debug('IT_ADMIN - showing all clients', { count: allClientIds.length, component: 'AssignedClients' });
       return allClientIds;
     }
     
@@ -118,9 +119,10 @@ export const AssignedClients: React.FC<AssignedClientsProps> = ({ currentUser, e
     
     const result = Array.from(allAssignedIds);
     
-    console.log('[AssignedClients] Assigned client IDs:', {
+    logger.debug('Assigned client IDs', {
       role: currentUser.role,
       assignedClients: assignedFromField,
+      component: 'AssignedClients',
       legacyClientId,
       normalizedResult: result,
       count: result.length
@@ -135,7 +137,7 @@ export const AssignedClients: React.FC<AssignedClientsProps> = ({ currentUser, e
       // For IT_ADMIN, directly use all clients from cache
       if (currentUser?.role === 'IT_ADMIN') {
         const safeClientCache = Array.isArray(clientCache) ? clientCache : [];
-        console.log('[AssignedClients] IT_ADMIN - Total clients in cache:', safeClientCache.length);
+        logger.debug('IT_ADMIN - Total clients in cache', { count: safeClientCache.length, component: 'AssignedClients' });
         
         if (safeClientCache.length === 0) {
           setClientDetails([]);
@@ -166,7 +168,7 @@ export const AssignedClients: React.FC<AssignedClientsProps> = ({ currentUser, e
         
         setClientDetails(allClients.sort((a, b) => a.companyName.localeCompare(b.companyName)));
         setLoading(false);
-        console.log('[AssignedClients] IT_ADMIN - Loaded all clients:', allClients.length);
+        logger.debug('IT_ADMIN - Loaded all clients', { count: allClients.length, component: 'AssignedClients' });
         return;
       }
       
@@ -310,7 +312,7 @@ export const AssignedClients: React.FC<AssignedClientsProps> = ({ currentUser, e
     } else {
       // Default behavior: filter by client in dashboard
       // This could be enhanced to navigate to a client-specific view
-      console.log('Navigate to client:', client.id, client.companyName);
+      logger.debug('Navigate to client', { clientId: client.id, clientName: client.companyName, component: 'AssignedClients' });
     }
   };
 

@@ -3,6 +3,7 @@
  */
 
 import { ErrorHandler, withTimeout, retryWithBackoff } from './errorHandler';
+import { logger } from './logger';
 
 const DEFAULT_TIMEOUT = 20000; // 20 seconds
 const DEFAULT_RETRIES = 2;
@@ -31,16 +32,7 @@ function getSupabase() {
       // Ignore import errors
     });
     
-    // If not loaded yet, try synchronous access (might work if already imported elsewhere)
-    try {
-      // This will only work if supabaseClient was already imported by another module
-      const module = require('../../lib/supabaseClient');
-      if (module?.supabase) {
-        supabaseInstance = module.supabase;
-      }
-    } catch {
-      // Ignore require errors
-    }
+    // Note: Synchronous require() removed - using async import only
   }
   
   return supabaseInstance;
@@ -49,7 +41,7 @@ function getSupabase() {
 class ApiClient {
   private async getAuthToken(): Promise<string | null> {
     try {
-      console.log('[apiClient.getAuthToken] Starting to get auth token...');
+      logger.debug('Starting to get auth token', { component: 'apiClient.getAuthToken' });
       
       // First, try to read directly from localStorage (fastest, no async call)
       if (typeof window !== 'undefined') {
@@ -85,14 +77,14 @@ class ApiClient {
                       || sessionData?.currentSession?.access_token;
                     
                     if (token && typeof token === 'string') {
-                      console.log('[apiClient.getAuthToken] Token retrieved from localStorage:', storageKey);
+                      logger.debug('Token retrieved from localStorage', { storageKey, component: 'apiClient.getAuthToken' });
                       return token;
                     }
                   } catch (parseError) {
                     // Try to parse as plain string (some formats store token directly)
                     if (storedSession.startsWith('eyJ')) {
                       // Looks like a JWT token
-                      console.log('[apiClient.getAuthToken] Token retrieved from localStorage (JWT format):', storageKey);
+                      logger.debug('Token retrieved from localStorage (JWT format)', { storageKey, component: 'apiClient.getAuthToken' });
                       return storedSession;
                     }
                   }
@@ -106,25 +98,25 @@ class ApiClient {
       }
       
       // If localStorage didn't work, try getSession() with a very short timeout
-      console.log('[apiClient.getAuthToken] localStorage not available, trying getSession()...');
+      logger.debug('localStorage not available, trying getSession()', { component: 'apiClient.getAuthToken' });
       
       // Get supabase instance
       let supabase = getSupabase();
       
       // If not available, try async import
       if (!supabase) {
-        console.log('[apiClient.getAuthToken] Supabase not cached, importing...');
+        logger.debug('Supabase not cached, importing', { component: 'apiClient.getAuthToken' });
         const module = await import('../../lib/supabaseClient');
         supabase = module.supabase;
         supabaseInstance = supabase;
       }
       
       if (!supabase) {
-        console.error('[apiClient.getAuthToken] Supabase not available (SSR?)');
+        logger.error('Supabase not available (SSR?)', undefined, { component: 'apiClient.getAuthToken' });
         return null;
       }
       
-      console.log('[apiClient.getAuthToken] Supabase client loaded, getting session...');
+      logger.debug('Supabase client loaded, getting session', { component: 'apiClient.getAuthToken' });
       
       // Use a lock to prevent concurrent getSession calls (they can block each other)
       if (!getSessionPromise) {
@@ -153,13 +145,13 @@ class ApiClient {
         const sessionResult = await Promise.race([sessionPromise, timeoutPromise]);
         if (timeoutId) clearTimeout(timeoutId);
         const token = sessionResult.data?.session?.access_token || null;
-        console.log('[apiClient.getAuthToken] Session retrieved from getSession():', token ? 'present' : 'null');
+        logger.debug('Session retrieved from getSession()', { hasToken: !!token, component: 'apiClient.getAuthToken' });
         return token;
       } catch (raceError) {
         if (timeoutId) clearTimeout(timeoutId);
         
         // If timeout, try localStorage again as final fallback
-        console.log('[apiClient.getAuthToken] getSession() timed out, trying localStorage fallback...');
+        logger.debug('getSession() timed out, trying localStorage fallback', { component: 'apiClient.getAuthToken' });
         if (typeof window !== 'undefined') {
           try {
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -190,13 +182,13 @@ class ApiClient {
                         || sessionData?.currentSession?.access_token;
                       
                       if (token && typeof token === 'string') {
-                        console.log('[apiClient.getAuthToken] Token retrieved from localStorage fallback:', storageKey);
+                        logger.debug('Token retrieved from localStorage fallback', { storageKey, component: 'apiClient.getAuthToken' });
                         return token;
                       }
                     } catch (parseError) {
                       // Try to parse as plain string (some formats store token directly)
                       if (storedSession.startsWith('eyJ')) {
-                        console.log('[apiClient.getAuthToken] Token retrieved from localStorage fallback (JWT format):', storageKey);
+                        logger.debug('Token retrieved from localStorage fallback (JWT format)', { storageKey, component: 'apiClient.getAuthToken' });
                         return storedSession;
                       }
                     }
@@ -209,11 +201,11 @@ class ApiClient {
           }
         }
         
-        console.error('[apiClient.getAuthToken] All attempts failed, returning null');
+        logger.error('All attempts failed, returning null', undefined, { component: 'apiClient.getAuthToken' });
         return null;
       }
     } catch (error) {
-      console.error('[apiClient.getAuthToken] Error in getAuthToken:', error);
+      logger.error('Error in getAuthToken', error, { component: 'apiClient.getAuthToken' });
       ErrorHandler.logError(error, { context: 'getAuthToken' });
       return null;
     }
@@ -223,7 +215,7 @@ class ApiClient {
     url: string,
     options: RequestOptions = {}
   ): Promise<Response> {
-    console.log(`[apiClient.makeRequest] Starting makeRequest for: ${url}`);
+    logger.debug('Starting makeRequest', { url, component: 'apiClient.makeRequest' });
     const {
       timeout = DEFAULT_TIMEOUT,
       skipAuth = false,
@@ -234,14 +226,14 @@ class ApiClient {
     // Get auth token if not skipped
     let authToken: string | null = null;
     if (!skipAuth) {
-      console.log(`[apiClient.makeRequest] Getting auth token...`);
+      logger.debug('Getting auth token', { component: 'apiClient.makeRequest' });
       authToken = await this.getAuthToken();
-      console.log(`[apiClient.makeRequest] Auth token retrieved:`, authToken ? 'present' : 'null');
+      logger.debug('Auth token retrieved', { hasToken: !!authToken, component: 'apiClient.makeRequest' });
       if (!authToken) {
         throw new Error('Authentication required. Please refresh the page and log in again.');
       }
     } else {
-      console.log(`[apiClient.makeRequest] Skipping auth (skipAuth=true)`);
+      logger.debug('Skipping auth (skipAuth=true)', { component: 'apiClient.makeRequest' });
     }
 
     // Prepare headers
@@ -258,7 +250,7 @@ class ApiClient {
       requestHeaders['Authorization'] = `Bearer ${authToken}`;
     }
 
-    console.log(`[apiClient] Making request to: ${url}`);
+    logger.debug('Making request', { url, component: 'apiClient' });
     
     // Create fetch promise with signal support
     const fetchPromise = fetch(url, {
@@ -267,12 +259,12 @@ class ApiClient {
       signal: options.signal, // Pass through AbortController signal
     });
 
-    console.log(`[apiClient] Fetch promise created, waiting for response (timeout: ${timeout}ms)...`);
+    logger.debug('Fetch promise created, waiting for response', { timeout, component: 'apiClient' });
     
     // Add timeout (but respect AbortController signal first)
     const response = await withTimeout(fetchPromise, timeout);
     
-    console.log(`[apiClient] Response received: ${response.status} ${response.statusText}`);
+    logger.debug('Response received', { status: response.status, statusText: response.statusText, component: 'apiClient' });
 
     // Handle non-OK responses
     if (!response.ok) {
@@ -302,18 +294,18 @@ class ApiClient {
   ): Promise<T> {
     const { retries = DEFAULT_RETRIES } = options;
     
-    console.log(`[apiClient.request] Starting request to: ${url}`, { method: options.method, retries });
+    logger.debug('Starting request', { url, method: options.method, retries, component: 'apiClient.request' });
 
     try {
-      console.log(`[apiClient.request] Calling retryWithBackoff...`);
+      logger.debug('Calling retryWithBackoff', { component: 'apiClient.request' });
       const response = await retryWithBackoff(
         () => {
-          console.log(`[apiClient.request] retryWithBackoff callback executing, calling makeRequest...`);
+          logger.debug('retryWithBackoff callback executing, calling makeRequest', { component: 'apiClient.request' });
           return this.makeRequest(url, options);
         },
         retries
       );
-      console.log(`[apiClient.request] Response received from retryWithBackoff`);
+      logger.debug('Response received from retryWithBackoff', { component: 'apiClient.request' });
 
       const data = await response.json();
       
@@ -348,17 +340,17 @@ class ApiClient {
   }
 
   async post<T>(url: string, body?: unknown, options?: RequestOptions): Promise<T> {
-    console.log(`[apiClient.post] POST request to: ${url}`, { body });
+    logger.debug('POST request', { url, hasBody: !!body, component: 'apiClient.post' });
     try {
       const result = await this.request<T>(url, {
         ...options,
         method: 'POST',
         body: JSON.stringify(body),
       });
-      console.log(`[apiClient.post] Request completed successfully`);
+      logger.debug('Request completed successfully', { component: 'apiClient.post' });
       return result;
     } catch (error) {
-      console.error(`[apiClient.post] Request failed:`, error);
+      logger.error('Request failed', error, { url, component: 'apiClient.post' });
       throw error;
     }
   }
