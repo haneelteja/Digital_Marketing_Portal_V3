@@ -32,6 +32,7 @@ const eslintConfig = [
       "next-env.d.ts",
       "scripts/**",
       ".next/types/**",
+      "src/utils/logger.ts", // Logger utility needs console methods
     ],
   },
 ];

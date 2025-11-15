@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
+  // Allow production builds to proceed even if linting errors exist.
+  // We already run separate linting in CI/local.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
   // Minimal webpack tweaks for browser bundles
   webpack: (config, { isServer }) => {
     if (!isServer) {
