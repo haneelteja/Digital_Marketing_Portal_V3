@@ -1234,6 +1234,7 @@ useEffect(() => {
 					<div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
 					<p className="text-gray-600 text-lg font-medium">Loading Dashboard...</p>
 					<p className="text-gray-400 text-sm mt-2">Please wait while we prepare your workspace</p>
+					<p className="text-gray-300 text-xs mt-4">If this takes too long, check the browser console for errors</p>
 				</div>
 			</div>
 		);
