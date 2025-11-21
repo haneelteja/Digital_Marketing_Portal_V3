@@ -26,6 +26,15 @@ export default function LoginPage() {
 			setLogoLoaded(false);
 			setLogoError(true);
 		};
+
+		// Check for Supabase configuration
+		const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+		const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+		if (!supabaseUrl || supabaseUrl.includes('placeholder') || !supabaseKey || supabaseKey.includes('placeholder')) {
+			setMessage('System Error: Supabase configuration is missing. Please check your environment variables.');
+			setLoading(true); // Disable form
+		}
 	}, []);
 
 	function validateFields(): boolean {
@@ -41,21 +50,21 @@ export default function LoginPage() {
 		event.preventDefault();
 		setMessage('');
 		setErrors({});
-		
+
 		if (!validateFields()) return;
-		
+
 		setLoading(true);
 		try {
 			const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 			if (error) throw error;
-			
+
 			// Check if password change is required (first login with temporary password)
 			if (data.user?.user_metadata?.requires_password_change) {
 				// Clear the flag from user metadata
 				await supabase.auth.updateUser({
 					data: { requires_password_change: false }
 				});
-				
+
 				// Redirect to password reset page
 				setMessage('Please set your permanent password...');
 				setTimeout(() => {
@@ -87,12 +96,12 @@ export default function LoginPage() {
 		event.preventDefault();
 		setMessage('');
 		setErrors({});
-		
+
 		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 			setErrors({ email: 'Enter a valid email' });
 			return;
 		}
-		
+
 		setLoading(true);
 		try {
 			// First, check if user exists and is active
@@ -111,7 +120,7 @@ export default function LoginPage() {
 					// Continue with password reset attempt even if check fails
 				} else {
 					checkData = await checkResponse.json();
-					
+
 					if (checkData.error) {
 						console.error('Check email API returned error:', checkData.error);
 						// Continue with password reset attempt
@@ -138,13 +147,13 @@ export default function LoginPage() {
 			const { error, data } = await supabase.auth.resetPasswordForEmail(email, {
 				redirectTo: `${window.location.origin}/auth/callback`,
 			});
-			
+
 			if (error) {
 				// Extract error information safely
 				const errorMessage = error?.message || String(error) || '';
 				const errorStatus = error?.status || (error as any)?.code || 0;
 				const errorName = error?.name || '';
-				
+
 				// Enhanced error logging
 				console.error('Password reset error:', {
 					error: error,
@@ -157,7 +166,7 @@ export default function LoginPage() {
 					errorJSON: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
 					errorKeys: error ? Object.keys(error) : [],
 				});
-				
+
 				// Handle specific error cases
 				if (errorMessage.includes('User not found') || errorStatus === 400) {
 					setMessage('This email address is not registered. Please contact your administrator to create an account.');
@@ -175,14 +184,14 @@ export default function LoginPage() {
 				}
 				return;
 			}
-			
+
 			// Success - email sent
 			setMessage('A password reset link has been sent to your email. Please check your inbox, spam folder, and Promotions tab. If you don\'t receive it within 5 minutes, the email service may be experiencing issues. Please contact your administrator or check Supabase Auth Logs.');
 			setShowForgotPassword(false);
 		} catch (err) {
 			const error = err as Error & { status?: number };
 			console.error('Password reset exception:', err);
-			
+
 			// Provide user-friendly error messages
 			if (error.status === 500) {
 				setMessage('Server error: Unable to send recovery email. Please contact your administrator to verify email service configuration.');
@@ -212,11 +221,11 @@ export default function LoginPage() {
 						<div className="flex justify-center mb-6">
 							{/* Logo Image - Only show if loaded successfully */}
 							{logoLoaded ? (
-								<img 
+								<img
 									src="/elma-logo.png"
 									alt="elma - defines purity"
 									className="h-auto w-auto max-w-[200px] md:max-w-[240px] object-contain mx-auto"
-									style={{ 
+									style={{
 										maxHeight: '180px',
 										imageRendering: 'auto'
 									}}
@@ -259,7 +268,7 @@ export default function LoginPage() {
 								<h3 className="text-xl font-semibold text-gray-900 mb-2">Reset Password</h3>
 								<p className="text-sm text-gray-600">Enter your email to receive a password reset link</p>
 							</div>
-							
+
 							<div>
 								<label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
 									Email Address
@@ -271,9 +280,8 @@ export default function LoginPage() {
 									value={email}
 									onChange={e => setEmail(e.target.value)}
 									required
-									className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-										errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
-									}`}
+									className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
+										}`}
 								/>
 								{errors.email && (
 									<p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -325,9 +333,8 @@ export default function LoginPage() {
 									onChange={e => setEmail(e.target.value)}
 									required
 									autoComplete="email"
-									className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-										errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
-									}`}
+									className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
+										}`}
 								/>
 								{errors.email && (
 									<p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -348,9 +355,8 @@ export default function LoginPage() {
 										onChange={e => setPassword(e.target.value)}
 										required
 										autoComplete="current-password"
-										className={`w-full px-4 py-3 pr-12 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-											errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
-										}`}
+										className={`w-full px-4 py-3 pr-12 rounded-lg border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white hover:border-gray-400'
+											}`}
 									/>
 									<button
 										type="button"
@@ -410,13 +416,12 @@ export default function LoginPage() {
 
 					{/* Message Display */}
 					{message && (
-						<div className={`mt-6 p-4 rounded-lg text-sm ${
-							message.includes('successful') || message.includes('sent') || message.includes('Redirecting')
+						<div className={`mt-6 p-4 rounded-lg text-sm ${message.includes('successful') || message.includes('sent') || message.includes('Redirecting')
 								? 'bg-green-50 text-green-800 border border-green-200'
 								: message.includes('Please set')
-								? 'bg-blue-50 text-blue-800 border border-blue-200'
-								: 'bg-red-50 text-red-800 border border-red-200'
-						}`}>
+									? 'bg-blue-50 text-blue-800 border border-blue-200'
+									: 'bg-red-50 text-red-800 border border-red-200'
+							}`}>
 							<div className="flex items-center gap-2">
 								{message.includes('successful') || message.includes('sent') || message.includes('Redirecting') || message.includes('Please set') ? (
 									<svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
